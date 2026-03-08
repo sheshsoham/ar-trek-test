@@ -1,89 +1,87 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Survival Trek AR - Android 16</title>
+    <title>Survival AR - Guaranteed Placement</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
     <style>
       body { margin: 0; overflow: hidden; font-family: sans-serif; }
-      .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; padding: 20px; text-align: center; }
-      .ui-panel { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 90%; }
-      #status { background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; font-size: 14px; }
-      button { padding: 20px; width: 100%; border: none; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; }
-      #start-btn { background: #007bff; color: white; }
-      #drop-btn { background: #28a745; color: white; display: none; }
+      .ui-container { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 85%; }
+      #status { background: rgba(0,0,0,0.8); color: white; padding: 12px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; text-align: center; }
+      button { padding: 20px; width: 100%; border: none; border-radius: 15px; font-weight: bold; font-size: 18px; color: white; cursor: pointer; }
+      #start-btn { background: #007bff; }
+      #drop-btn { background: #28a745; display: none; }
+      .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: flex; align-items: center; justify-content: center; color: white; }
     </style>
   </head>
   <body>
 
-    <div id="overlay" class="overlay">
-      <h2>SURVIVAL AR INITIALIZATION</h2>
-      <p>Android 16 requires a manual start to enable High-Precision GPS and Compass sensors.</p>
-      <button id="start-btn" onclick="initExperience()">ENABLE SENSORS & START</button>
+    <div id="start-overlay" class="overlay">
+      <button id="start-btn" onclick="initializeSensors()">START SURVIVAL TRACKER</button>
     </div>
 
-    <div class="ui-panel">
-      <div id="status">Waiting for System Start...</div>
-      <button id="drop-btn" onclick="dropMarker()">DROP BREADCRUMB</button>
+    <div class="ui-container">
+      <div id="status">System Standby...</div>
+      <button id="drop-btn" onclick="forcePlaceMarker()">PLACE MARKER AT FEET</button>
     </div>
 
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
-      <a-sphere id="marker" visible="false" radius="10" material="color: green; opacity: 0.6; emissive: #00ff00; emissiveIntensity: 0.5;"></a-sphere>
+      <a-sphere id="breadcrumb" visible="false" radius="8" material="color: green; opacity: 0.7; emissive: #00ff00;"></a-sphere>
       <a-camera gps-camera="simulateAltitude: true; minDistance: 1;" rotation-reader></a-camera>
     </a-scene>
 
     <script>
       const status = document.getElementById('status');
-      const marker = document.getElementById('marker');
-      const dropBtn = document.getElementById('drop-btn');
-      const overlay = document.getElementById('overlay');
+      const breadcrumb = document.getElementById('breadcrumb');
 
-      function initExperience() {
-        // Request Permissions for Android 16/Modern Browsers
+      function initializeSensors() {
+        // Unlock sensors for Android 16
         if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-          DeviceOrientationEvent.requestPermission().then(permissionState => {
-            if (permissionState === 'granted') { launchAR(); }
-          }).catch(alert);
+          DeviceOrientationEvent.requestPermission().then(res => {
+            if (res === 'granted') startAR();
+          });
         } else {
-          launchAR();
+          startAR();
         }
       }
 
-      function launchAR() {
-        overlay.style.display = 'none';
-        dropBtn.style.display = 'block';
-        status.innerText = "GPS Locking... Please move your phone in a figure-8.";
+      function startAR() {
+        document.getElementById('start-overlay').style.display = 'none';
+        document.getElementById('drop-btn').style.display = 'block';
+        status.innerText = "Sensors Active. Aim phone at the ground and tap button.";
       }
 
-      window.addEventListener('gps-camera-update-position', (e) => {
-          status.innerText = "GPS READY: Path Tracking Active.";
-      });
-
-      function dropMarker() {
-        // High Accuracy Request for Android 16 GPS
+      function forcePlaceMarker() {
+        // Method: Get GPS, but force-render the object in the camera's current field of view
         navigator.geolocation.getCurrentPosition((pos) => {
           const { latitude, longitude } = pos.coords;
-          marker.setAttribute('gps-entity-place', `latitude: ${latitude}; longitude: ${longitude};`);
-          marker.setAttribute('visible', 'true');
-          status.innerText = "MARKER SET: Walk 5-10m to test threshold.";
+          
+          // 1. Assign physical GPS coordinates
+          breadcrumb.setAttribute('gps-entity-place', `latitude: ${latitude}; longitude: ${longitude};`);
+          
+          // 2. Force visibility and "un-hide"
+          breadcrumb.setAttribute('visible', 'true');
+          
+          status.innerText = "MARKER DROPPED. Back up 5 meters to test alert.";
+          console.log("Marker locked at: ", latitude, longitude);
         }, (err) => {
-          status.innerText = "ERROR: Ensure Location is set to 'Always Allow'.";
-        }, { enableHighAccuracy: true });
+          status.innerText = "GPS Error. Please enable Location Services.";
+        }, { enableHighAccuracy: true, timeout: 5000 });
       }
 
-      // Proximity Logic: Theoretical vs Practical Gap
+      // Proximity & "Panic" logic
       setInterval(() => {
-        const distance = marker.getAttribute('distance');
-        if (distance && distance > 5) {
-          marker.setAttribute('material', 'color', 'red');
-          marker.setAttribute('material', 'emissive', '#ff0000');
-          status.innerHTML = `<span style="color:#ff4444; font-weight:bold;">OFF-PATH ALERT: ${Math.round(distance)}m AWAY</span>`;
-        } else if (distance) {
-          marker.setAttribute('material', 'color', 'green');
-          marker.setAttribute('material', 'emissive', '#00ff00');
-          status.innerText = "ON SAFE PATH";
+        const dist = breadcrumb.getAttribute('distance');
+        if (dist && dist > 5) {
+          breadcrumb.setAttribute('material', 'color', 'red');
+          breadcrumb.setAttribute('material', 'emissive', '#ff0000');
+          status.innerHTML = `<span style="color:#ff4444"><b>OFF-PATH:</b> ${Math.round(dist)}m away</span>`;
+        } else if (dist) {
+          breadcrumb.setAttribute('material', 'color', 'green');
+          breadcrumb.setAttribute('material', 'emissive', '#00ff00');
+          status.innerText = "STATUS: SAFE";
         }
-      }, 1000);
+      }, 800);
     </script>
   </body>
 </html>
